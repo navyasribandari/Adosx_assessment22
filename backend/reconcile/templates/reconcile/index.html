@@ -1,0 +1,44 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>DealerOS reconciliation</title>
+<style>body{font-family:sans-serif;margin:24px}table{border-collapse:collapse}
+th,td{border:1px solid #ccc;padding:6px 10px;text-align:left}th.sort{cursor:pointer}
+td.num{text-align:right}.err{color:#b00}</style></head>
+<body>
+<h1>System A vs System B disagreements</h1>
+<label>Org <select id="org"><option>ORG-A</option><option>ORG-B</option></select></label>
+<label>Reason <select id="reason"><option value="">All</option>
+{% for r in reasons %}<option>{{ r }}</option>{% endfor %}</select></label>
+<p id="msg"></p>
+<table><thead><tr><th>Reason</th><th>Record ID</th><th>Location</th>
+<th class="sort" id="vh">System A value ⇅</th><th>System B value</th><th>Difference</th></tr></thead>
+<tbody id="rows"></tbody></table>
+<script>
+let sort = "";
+const $ = id => document.getElementById(id);
+const cell = v => (v === null || v === undefined) ? "" : v;
+async function load() {
+  const p = new URLSearchParams({org: $("org").value});
+  if ($("reason").value) p.set("reason", $("reason").value);
+  if (sort) p.set("sort", sort);
+  $("msg").textContent = ""; $("msg").className = "";
+  try {
+    const res = await fetch("/api/disagreements/?" + p);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.status);
+    const tb = $("rows"); tb.innerHTML = "";
+    data.results.forEach(r => {
+      const tr = document.createElement("tr");
+      const loc = r.b_location_hidden ? r.location + " (other system's location hidden)" : r.location;
+      [r.reason, r.record_id, loc, r.a_value, r.b_value, r.difference].forEach((v, i) => {
+        const td = document.createElement("td");
+        td.textContent = cell(v); if (i > 2) td.className = "num"; tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    if (!data.results.length) $("msg").textContent = "No disagreements found.";
+  } catch (e) { $("msg").textContent = "Error: " + e.message; $("msg").className = "err"; }
+}
+$("org").onchange = $("reason").onchange = load;
+$("vh").onclick = () => { sort = sort === "value" ? "-value" : "value"; load(); };
+load();
+</script></body></html>
